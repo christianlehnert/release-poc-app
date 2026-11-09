@@ -1,13 +1,13 @@
 name: Simulate releases of other apps
 
-# Stands in for the other application repositories of a full release.
+# Stands in for the application repositories that do not exist in the PoC (loader, admin, timeout, ...).
 # Each line is what one application repository would send after its own release.
 
 on:
   workflow_dispatch:
     inputs:
       changes:
-        description: 'One per line or separated by ";", for example: ui_tag = "release/2.1.0"; worker_tag = "release/1.4.0"'
+        description: 'One per line or separated by ";", for example: loader_tag = "release/1.2.1"; db_core_schema = "1.3.0"'
         type: string
         required: true
 
@@ -15,27 +15,28 @@ permissions:
   contents: read
 
 jobs:
-  prepare:
+  simulate:
     runs-on: ubuntu-latest
-    outputs:
-      changes: ${{ steps.split.outputs.changes }}
     steps:
-      - id: split
+      - name: Get a token for the release bot
+        id: bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: release-poc-config-test
+      - uses: actions/checkout@v6
+        with:
+          repository: ${{ github.repository_owner }}/release-poc-deployment
+          ref: release/2.0.2
+          path: templates
+      - name: Write into the collecting pull request
         env:
+          GH_TOKEN: ${{ steps.bot.outputs.token }}
+          BOT_SLUG: ${{ steps.bot.outputs.app-slug }}
+          OWNER: ${{ github.repository_owner }}
           CHANGES: ${{ inputs.changes }}
         run: |
-          {
-            echo "changes<<EOF"
-            echo "$CHANGES" | tr ';' '\n' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' | grep .
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-  bump-config:
-    needs: prepare
-    uses: christianlehnert/release-poc-deployment/.github/workflows/bump-config.yml@release/1.1.0
-    with:
-      changes: ${{ needs.prepare.outputs.changes }}
-      source: "simulated releases of other apps"
-      client-id: ${{ vars.RELEASE_BOT_CLIENT_ID }}
-    secrets:
-      private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+          echo "$CHANGES" | tr ';' '\n' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' | grep . > changes.txt
+          bash templates/scripts/bump-config.sh test changes.txt "simulated releases of other apps"
