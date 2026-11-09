@@ -1,0 +1,21 @@
+name: Release
+# Thin caller: the logic lives once in release-poc-deployment (templates release/2.0.0).
+# A published release retags the image (no rebuild) and goes into the collecting pull request of TEST.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  release:
+    uses: christianlehnert/release-poc-deployment/.github/workflows/app-release.yml@release/2.0.2
+    with:
+      app-name: app
+      templates-ref: release/2.0.2
+      client-id: ${{ vars.RELEASE_BOT_CLIENT_ID }}
+    secrets:
+      private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
