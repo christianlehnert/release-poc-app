@@ -1,0 +1,41 @@
+name: Simulate releases of other apps
+
+# Stands in for the other application repositories of a full release.
+# Each line is what one application repository would send after its own release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      changes:
+        description: 'One per line or separated by ";", for example: ui_tag = "release/2.1.0"; worker_tag = "release/1.4.0"'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      changes: ${{ steps.split.outputs.changes }}
+    steps:
+      - id: split
+        env:
+          CHANGES: ${{ inputs.changes }}
+        run: |
+          {
+            echo "changes<<EOF"
+            echo "$CHANGES" | tr ';' '\n' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' | grep .
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+  bump-config:
+    needs: prepare
+    uses: christianlehnert/release-poc-deployment/.github/workflows/bump-config.yml@release/1.1.0
+    with:
+      changes: ${{ needs.prepare.outputs.changes }}
+      source: "simulated releases of other apps"
+      client-id: ${{ vars.RELEASE_BOT_CLIENT_ID }}
+    secrets:
+      private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}

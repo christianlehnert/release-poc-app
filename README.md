@@ -1,7 +1,16 @@
 # release-poc-app
 
-Fake application for the release PoC. Its only job: when you publish a release here, the workflow **Release Tag** asks the release bot to open a pull request in `release-poc-config-test`.
+Application of the release PoC, with the branch model of a real app:
 
-The whole flow is described in [release-poc-deployment](https://github.com/christianlehnert/release-poc-deployment#readme).
+- `main`: development of the next version
+- `releases/x.y`: what runs in PROD. Fixes for PROD are merged here and released from here
 
-**Start a release:** Releases → Draft a new release → tag `release/1.0.1` (next free number) → Publish release.
+Workflows:
+
+| Workflow | When | What |
+|---|---|---|
+| Release Tag | a release is published (from main or a release branch) | the release bot writes `app_tag` into the collecting pull request of config-test |
+| Forward-port to main | something is pushed to `releases/**` | the bot cherry-picks the new commits onto main and opens the pull request |
+| Simulate releases of other apps | by hand | stands in for the other application repositories of a full release |
+
+The whole flow: [release-poc-deployment](https://github.com/christianlehnert/release-poc-deployment#readme).

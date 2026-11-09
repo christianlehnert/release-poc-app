@@ -1,8 +1,9 @@
 name: Release Tag
 
-# Runs when a release is published in this app repository.
-# 1. "Tags the image" (simulated: in a real setup the existing image gets the release tag, nothing is rebuilt).
-# 2. The release bot opens a pull request in release-poc-config-test with the new version.
+# Runs when a release is published (from main or from a release branch releases/x.y).
+# 1. "Tags the image" (simulated: the existing image gets the release tag, nothing is rebuilt).
+# 2. Calls the reusable workflow of release-poc-deployment: the release bot writes the version
+#    into the collecting pull request of release-poc-config-test.
 
 on:
   release:
@@ -18,53 +19,16 @@ jobs:
       - name: Tag image (simulated)
         env:
           TAG: ${{ github.event.release.tag_name }}
+          TARGET: ${{ github.event.release.target_commitish }}
         run: |
-          echo "Image registry.example/app:${TAG//\//-} tagged. Nothing rebuilt." | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Image registry.example/app:${TAG//\//-} tagged (built from ${TARGET}). Nothing rebuilt." | tee -a "$GITHUB_STEP_SUMMARY"
 
-  open-config-pr:
+  bump-config:
     needs: tag-image
-    runs-on: ubuntu-latest
-    steps:
-      - name: Get a token for the release bot
-        id: bot
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ vars.RELEASE_BOT_APP_ID }}
-          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: release-poc-config-test
-
-      - name: Open pull request in config-test
-        env:
-          GH_TOKEN: ${{ steps.bot.outputs.token }}
-          BOT_SLUG: ${{ steps.bot.outputs.app-slug }}
-          TAG: ${{ github.event.release.tag_name }}
-          OWNER: ${{ github.repository_owner }}
-          RELEASE_URL: ${{ github.event.release.html_url }}
-        run: |
-          set -euo pipefail
-          repo="${OWNER}/release-poc-config-test"
-          bot_id=$(gh api "/users/${BOT_SLUG}%5Bbot%5D" -q .id)
-          git clone -q "https://x-access-token:${GH_TOKEN}@github.com/${repo}.git" cfg
-          cd cfg
-          git config user.name "${BOT_SLUG}[bot]"
-          git config user.email "${bot_id}+${BOT_SLUG}[bot]@users.noreply.github.com"
-          branch="bump/app-${TAG//\//-}"
-          git switch -q -c "$branch"
-          sed -i -E "s#^(app_tag[[:space:]]*=[[:space:]]*\").*(\")#\1${TAG}\2#" terraform/versions.tfvars
-          if git diff --quiet; then
-            echo "config-test already has app_tag = ${TAG}, nothing to do." | tee -a "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          git commit -q -am "app_tag = ${TAG}"
-          git push -q --force origin "$branch"
-          if gh pr view "$branch" --repo "$repo" >/dev/null 2>&1; then
-            url=$(gh pr view "$branch" --repo "$repo" --json url -q .url)
-          else
-            url=$(gh pr create --repo "$repo" --head "$branch" --base main \
-              --title "test: app_tag = ${TAG}" \
-              --body "Opened by the release bot after the release [${TAG}](${RELEASE_URL}) of release-poc-app.
-
-          After the merge the bot tags this configuration and deploys it to TEST. If TEST succeeds, the bot opens the pull requests for prod-a and prod-b.")
-          fi
-          echo "Pull request: ${url}" | tee -a "$GITHUB_STEP_SUMMARY"
+    uses: christianlehnert/release-poc-deployment/.github/workflows/bump-config.yml@release/1.1.0
+    with:
+      changes: app_tag = "${{ github.event.release.tag_name }}"
+      source: "release-poc-app ${{ github.event.release.tag_name }}"
+      client-id: ${{ vars.RELEASE_BOT_CLIENT_ID }}
+    secrets:
+      private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
