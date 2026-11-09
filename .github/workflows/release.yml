@@ -12,10 +12,10 @@ permissions:
 
 jobs:
   release:
-    uses: christianlehnert/release-poc-deployment/.github/workflows/app-release.yml@release/2.0.0
+    uses: christianlehnert/release-poc-deployment/.github/workflows/app-release.yml@release/2.0.1
     with:
       app-name: app
-      templates-ref: release/2.0.0
+      templates-ref: release/2.0.1
       client-id: ${{ vars.RELEASE_BOT_CLIENT_ID }}
     secrets:
       private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
