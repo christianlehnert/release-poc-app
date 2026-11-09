@@ -1,0 +1,1 @@
+timeout = 30s  # fix: PROD timed out after 10s
