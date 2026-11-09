@@ -11,9 +11,9 @@ permissions:
 
 jobs:
   branches:
-    uses: christianlehnert/release-poc-deployment/.github/workflows/app-branches.yml@release/2.0.1
+    uses: christianlehnert/release-poc-deployment/.github/workflows/app-branches.yml@release/2.0.2
     with:
-      templates-ref: release/2.0.1
+      templates-ref: release/2.0.2
       client-id: ${{ vars.RELEASE_BOT_CLIENT_ID }}
     secrets:
       private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
