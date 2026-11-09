@@ -1,0 +1,22 @@
+name: CI
+# Thin caller: the logic lives once in release-poc-deployment (templates release/2.0.0).
+# Quality gates on every pull request; on push: build the image once, deploy to DEV (main) or preview (branches).
+
+on:
+  pull_request:
+  push:
+    branches: [main, "releases/**", "feature/**", "bugfix/**", "hotfix/**", "scope/**"]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  ci:
+    uses: christianlehnert/release-poc-deployment/.github/workflows/app-ci.yml@release/2.0.0
+    with:
+      app-name: app
+      templates-ref: release/2.0.0
+      client-id: ${{ vars.RELEASE_BOT_CLIENT_ID }}
+    secrets:
+      private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}

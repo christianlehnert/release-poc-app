@@ -1,0 +1,19 @@
+name: Branches
+# Thin caller: the logic lives once in release-poc-deployment (templates release/2.0.0).
+# releases/**: forward-port to main.  main: sync into scope/** branches.
+
+on:
+  push:
+    branches: [main, "releases/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  branches:
+    uses: christianlehnert/release-poc-deployment/.github/workflows/app-branches.yml@release/2.0.0
+    with:
+      templates-ref: release/2.0.0
+      client-id: ${{ vars.RELEASE_BOT_CLIENT_ID }}
+    secrets:
+      private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
