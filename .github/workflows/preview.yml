@@ -1,0 +1,52 @@
+name: Preview on TEST
+
+# A push to a feature or scope branch goes to TEST without a release:
+# "build" (simulated) -> image preview/<branch>-<commit> -> the release bot starts Deploy on test
+# with the newest configuration of TEST plus this one preview image.
+# Previews are never promoted to PROD; the next normal TEST deployment replaces them.
+
+on:
+  push:
+    branches: ['feature/**', 'scope/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build image (simulated)
+        id: build
+        run: |
+          branch="${GITHUB_REF_NAME//\//-}"
+          version="preview/${branch}-${GITHUB_SHA::7}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Image registry.example/app:${version//\//-} built from ${GITHUB_REF_NAME} (simulated)." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Get a token for the release bot
+        id: bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: release-poc-deployment
+
+      - name: Start Deploy on test with the preview
+        env:
+          GH_TOKEN: ${{ steps.bot.outputs.token }}
+          OWNER: ${{ github.repository_owner }}
+          VERSION: ${{ steps.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          pipeline_tag=$(gh release view --repo "${OWNER}/release-poc-deployment" --json tagName -q .tagName)
+          config_tag=$(gh release view --repo "${OWNER}/release-poc-config-test" --json tagName -q .tagName)
+          gh workflow run deploy.yml --repo "${OWNER}/release-poc-deployment" --ref "$pipeline_tag" \
+            -f environment=test -f config_tag="$config_tag" -f preview="app=${VERSION}"
+          echo "Deploy started on test: config ${config_tag} + preview app=${VERSION} (pipeline ${pipeline_tag})." | tee -a "$GITHUB_STEP_SUMMARY"
